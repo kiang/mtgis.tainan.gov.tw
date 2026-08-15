@@ -3,7 +3,7 @@
 // Usage: php crawl_update.php
 
 $apiUrl = 'https://mtgis.tainan.gov.tw/api/RoadApplicTwo/ApprovedQuery/';
-$dataDir = __DIR__ . '/data';
+$dataDir = dirname(__DIR__) . '/data';
 
 if (!is_dir($dataDir)) {
     mkdir($dataDir, 0755, true);
