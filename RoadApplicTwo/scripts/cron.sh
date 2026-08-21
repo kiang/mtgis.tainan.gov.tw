@@ -3,15 +3,13 @@
 # Get the directory where this script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-DATA_DIR="$PROJECT_DIR/data"
 
 echo "Starting data fetch process..."
 echo "Project directory: $PROJECT_DIR"
-echo "Data directory: $DATA_DIR"
 
-# Pull latest changes from data repository
-echo "Pulling latest changes from data repository..."
-cd "$DATA_DIR"
+# Pull latest changes
+echo "Pulling latest changes..."
+cd "$PROJECT_DIR"
 git pull
 
 if [ $? -ne 0 ]; then
@@ -19,7 +17,6 @@ if [ $? -ne 0 ]; then
 fi
 
 # Execute the update script
-cd "$PROJECT_DIR"
 php "$SCRIPT_DIR/crawl_update.php"
 
 if [ $? -ne 0 ]; then
@@ -29,14 +26,6 @@ fi
 
 echo "Update completed successfully"
 
-# Change to data directory and commit changes
-cd "$DATA_DIR"
-
-if [ ! -d .git ]; then
-    echo "Error: Data directory is not a git repository"
-    exit 1
-fi
-
 # Check if there are any changes
 if [[ -z $(git status -s) ]]; then
     echo "No changes to commit"
@@ -45,14 +34,10 @@ fi
 
 echo "Changes detected, committing and pushing..."
 
-# Add all changes
-git add .
-
-# Commit with timestamp
+git add -A
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 git commit -m "Auto update: $TIMESTAMP"
 
-# Push to remote
 git push
 
 if [ $? -eq 0 ]; then
