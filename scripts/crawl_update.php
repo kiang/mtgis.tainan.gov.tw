@@ -1,5 +1,7 @@
 <?php
-// Crawl the first page (50 newest events) and merge new ones into existing data
+// Crawl the first page (50 newest events) and save each as individual file
+// Each event saved as data/{Year}/{Month}/{管制編號}.json
+// Year/Month based on the start time of 起訖時間
 // Usage: php crawl_update.php
 
 $apiUrl = 'https://mtgis.tainan.gov.tw/api/RoadApplicTwo/ApprovedQuery/';
@@ -55,49 +57,31 @@ echo "Fetched " . count($json['data']) . " records (total on server: {$json['rec
 
 $newCount = 0;
 $updatedCount = 0;
-$updatedYears = [];
 
 foreach ($json['data'] as $record) {
     $controlNo = $record['管制編號'];
-    $rocYear = intval(substr($controlNo, 0, 3));
-    $adYear = $rocYear + 1911;
-
-    $yearDir = $dataDir . '/' . $adYear;
-    if (!is_dir($yearDir)) {
-        mkdir($yearDir, 0755, true);
+    $startDate = explode('~', $record['起訖時間'])[0];
+    if (preg_match('/^(\d{4})\/(\d{2})\//', $startDate, $m)) {
+        $year = $m[1];
+        $month = $m[2];
+    } else {
+        echo "Warning: Cannot parse date for {$controlNo}: {$record['起訖時間']}\n";
+        continue;
     }
 
-    $filePath = $yearDir . '/events.json';
-    $existing = [];
+    $dir = $dataDir . '/' . $year . '/' . $month;
+    if (!is_dir($dir)) {
+        mkdir($dir, 0755, true);
+    }
+
+    $filePath = $dir . '/' . $controlNo . '.json';
     if (file_exists($filePath)) {
-        $existing = json_decode(file_get_contents($filePath), true) ?: [];
-    }
-
-    $existingIndex = [];
-    foreach ($existing as $i => $e) {
-        $existingIndex[$e['管制編號']] = $i;
-    }
-
-    if (isset($existingIndex[$controlNo])) {
-        $existing[$existingIndex[$controlNo]] = $record;
         $updatedCount++;
     } else {
-        $existing[] = $record;
         $newCount++;
     }
 
-    usort($existing, function ($a, $b) {
-        return strcmp($b['管制編號'], $a['管制編號']);
-    });
-
-    file_put_contents($filePath, json_encode($existing, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-    $updatedYears[$adYear] = true;
-}
-
-foreach (array_keys($updatedYears) as $year) {
-    $filePath = $dataDir . '/' . $year . '/events.json';
-    $records = json_decode(file_get_contents($filePath), true);
-    echo "Year {$year}: " . count($records) . " records\n";
+    file_put_contents($filePath, json_encode($record, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
 }
 
 echo "New: {$newCount}, Updated: {$updatedCount}\n";

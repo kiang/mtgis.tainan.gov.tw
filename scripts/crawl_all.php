@@ -1,5 +1,7 @@
 <?php
 // Crawl all approved events from 臺南市政府道路路權申請系統
+// Each event saved as data/{Year}/{Month}/{管制編號}.json
+// Year/Month based on the start time of 起訖時間
 // Usage: php crawl_all.php
 
 $apiUrl = 'https://mtgis.tainan.gov.tw/api/RoadApplicTwo/ApprovedQuery/';
@@ -71,25 +73,26 @@ while (true) {
 
 echo "Total records fetched: " . count($allRecords) . "\n";
 
-$byYear = [];
+$saved = 0;
 foreach ($allRecords as $record) {
     $controlNo = $record['管制編號'];
-    $rocYear = intval(substr($controlNo, 0, 3));
-    $adYear = $rocYear + 1911;
-    $byYear[$adYear][] = $record;
-}
-
-foreach ($byYear as $year => $records) {
-    $yearDir = $dataDir . '/' . $year;
-    if (!is_dir($yearDir)) {
-        mkdir($yearDir, 0755, true);
+    $startDate = explode('~', $record['起訖時間'])[0];
+    if (preg_match('/^(\d{4})\/(\d{2})\//', $startDate, $m)) {
+        $year = $m[1];
+        $month = $m[2];
+    } else {
+        echo "Warning: Cannot parse date for {$controlNo}: {$record['起訖時間']}\n";
+        continue;
     }
-    $filePath = $yearDir . '/events.json';
-    usort($records, function ($a, $b) {
-        return strcmp($b['管制編號'], $a['管制編號']);
-    });
-    file_put_contents($filePath, json_encode($records, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-    echo "Saved " . count($records) . " records to {$filePath}\n";
+
+    $dir = $dataDir . '/' . $year . '/' . $month;
+    if (!is_dir($dir)) {
+        mkdir($dir, 0755, true);
+    }
+
+    file_put_contents($dir . '/' . $controlNo . '.json', json_encode($record, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+    $saved++;
 }
 
+echo "Saved {$saved} event files.\n";
 echo "Done.\n";
