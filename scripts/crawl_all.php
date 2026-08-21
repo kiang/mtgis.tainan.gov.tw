@@ -73,41 +73,61 @@ while (true) {
 
 echo "Total records fetched: " . count($allRecords) . "\n";
 
+function getCoveredMonths($timeRange) {
+    $parts = explode('~', $timeRange);
+    if (count($parts) !== 2) return [];
+    if (!preg_match('/^(\d{4})\/(\d{2})\/(\d{2})/', trim($parts[0]), $s)) return [];
+    if (!preg_match('/^(\d{4})\/(\d{2})\/(\d{2})/', trim($parts[1]), $e)) return [];
+    $months = [];
+    $cur = new DateTime("{$s[1]}-{$s[2]}-01");
+    $end = new DateTime("{$e[1]}-{$e[2]}-01");
+    while ($cur <= $end) {
+        $months[] = $cur->format('Y') . '/' . $cur->format('m');
+        $cur->modify('+1 month');
+    }
+    return $months;
+}
+
 $saved = 0;
 $monthIndex = [];
 foreach ($allRecords as $record) {
     $controlNo = $record['管制編號'];
-    $startDate = explode('~', $record['起訖時間'])[0];
-    if (preg_match('/^(\d{4})\/(\d{2})\//', $startDate, $m)) {
-        $year = $m[1];
-        $month = $m[2];
-    } else {
+    $months = getCoveredMonths($record['起訖時間']);
+    if (empty($months)) {
         echo "Warning: Cannot parse date for {$controlNo}: {$record['起訖時間']}\n";
         continue;
     }
 
-    $dir = $dataDir . '/' . $year . '/' . $month;
+    $primaryMonth = $months[0];
+    $dir = $dataDir . '/' . $primaryMonth;
     if (!is_dir($dir)) {
         mkdir($dir, 0755, true);
     }
 
     file_put_contents($dir . '/' . $controlNo . '.json', json_encode($record, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-    $key = $year . '/' . $month;
-    $monthIndex[$key][] = [
+
+    $entry = [
         '管制編號' => $controlNo,
         '地區' => $record['地區'],
         '集或遊' => $record['集或遊'],
         '起訖時間' => $record['起訖時間'],
         '集會場所' => $record['集會場所'],
     ];
+    foreach ($months as $key) {
+        $monthIndex[$key][] = $entry;
+    }
     $saved++;
 }
 
 foreach ($monthIndex as $key => $entries) {
+    $dir = $dataDir . '/' . $key;
+    if (!is_dir($dir)) {
+        mkdir($dir, 0755, true);
+    }
     usort($entries, function ($a, $b) {
         return strcmp($b['管制編號'], $a['管制編號']);
     });
-    $indexPath = $dataDir . '/' . $key . '/index.json';
+    $indexPath = $dir . '/index.json';
     file_put_contents($indexPath, json_encode($entries, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
     echo "Index: {$key} - " . count($entries) . " events\n";
 }
