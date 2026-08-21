@@ -74,6 +74,7 @@ while (true) {
 echo "Total records fetched: " . count($allRecords) . "\n";
 
 $saved = 0;
+$monthIndex = [];
 foreach ($allRecords as $record) {
     $controlNo = $record['管制編號'];
     $startDate = explode('~', $record['起訖時間'])[0];
@@ -91,7 +92,24 @@ foreach ($allRecords as $record) {
     }
 
     file_put_contents($dir . '/' . $controlNo . '.json', json_encode($record, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+    $key = $year . '/' . $month;
+    $monthIndex[$key][] = [
+        '管制編號' => $controlNo,
+        '地區' => $record['地區'],
+        '集或遊' => $record['集或遊'],
+        '起訖時間' => $record['起訖時間'],
+        '集會場所' => $record['集會場所'],
+    ];
     $saved++;
+}
+
+foreach ($monthIndex as $key => $entries) {
+    usort($entries, function ($a, $b) {
+        return strcmp($b['管制編號'], $a['管制編號']);
+    });
+    $indexPath = $dataDir . '/' . $key . '/index.json';
+    file_put_contents($indexPath, json_encode($entries, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+    echo "Index: {$key} - " . count($entries) . " events\n";
 }
 
 echo "Saved {$saved} event files.\n";

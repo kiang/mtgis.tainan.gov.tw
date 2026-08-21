@@ -57,6 +57,7 @@ echo "Fetched " . count($json['data']) . " records (total on server: {$json['rec
 
 $newCount = 0;
 $updatedCount = 0;
+$touchedMonths = [];
 
 foreach ($json['data'] as $record) {
     $controlNo = $record['管制編號'];
@@ -82,6 +83,30 @@ foreach ($json['data'] as $record) {
     }
 
     file_put_contents($filePath, json_encode($record, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+    $touchedMonths[$year . '/' . $month] = true;
+}
+
+foreach (array_keys($touchedMonths) as $key) {
+    $monthDir = $dataDir . '/' . $key;
+    $entries = [];
+    foreach (glob($monthDir . '/*.json') as $file) {
+        if (basename($file) === 'index.json') {
+            continue;
+        }
+        $event = json_decode(file_get_contents($file), true);
+        $entries[] = [
+            '管制編號' => $event['管制編號'],
+            '地區' => $event['地區'],
+            '集或遊' => $event['集或遊'],
+            '起訖時間' => $event['起訖時間'],
+            '集會場所' => $event['集會場所'],
+        ];
+    }
+    usort($entries, function ($a, $b) {
+        return strcmp($b['管制編號'], $a['管制編號']);
+    });
+    file_put_contents($monthDir . '/index.json', json_encode($entries, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+    echo "Index: {$key} - " . count($entries) . " events\n";
 }
 
 echo "New: {$newCount}, Updated: {$updatedCount}\n";
